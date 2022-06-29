@@ -40,7 +40,7 @@ func handler(numStories int, tpl *template.Template) http.HandlerFunc {
 		}
 		data := templateData{
 			Stories: stories,
-			Time:    time.Now().Sub(start),
+			Time:    time.Since(start),
 		}
 		err = tpl.Execute(w, data)
 		if err != nil {
@@ -56,7 +56,7 @@ var (
 )
 
 func getCachedStories(numStories int) ([]item, error) {
-	if time.Now().Sub(cacheExpiration) < 0 {
+	if time.Since(cacheExpiration) < 0 {
 		return cache, nil
 	}
 	stories, err := getTopStories(numStories)
