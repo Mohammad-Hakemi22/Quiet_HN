@@ -52,18 +52,32 @@ func handler(numStories int, tpl *template.Template) http.HandlerFunc {
 
 func getTopStories(numStories int) ([]item, error) {
 	var client client.Client
+	var stories []item
 	ids, err := client.TopItems()
 	if err != nil {
 		// http.Error(w, "Failed to load top stories", http.StatusInternalServerError)
 		return nil, errors.New("failed to load top stories")
 	}
+
+	// having exactly 30 stories
+	at := 0
+	for len(stories) < numStories {
+		need := (numStories - len(stories)) * (5/4)  // for make sure we have already 30 stories id (error on get stories), getting 30 * 1.25 ids
+		stories = append(stories, getStories(ids[at:at+need])...)
+		at += need
+	}
+	return stories[:numStories], nil // return exactly 30 stories, because we have more than 30 ids (need var)
+}
+
+func getStories(ids []int) []item {
+	var client client.Client
 	type result struct {
 		idx  int
 		item item
 		err  error
 	}
 	resultCh := make(chan result)
-	for i := 0; i < numStories; i++ {
+	for i := 0; i < len(ids); i++ {
 		go func(idx, id int) {
 			hnItem, err := client.GetItem(id)
 			if err != nil {
@@ -73,7 +87,7 @@ func getTopStories(numStories int) ([]item, error) {
 		}(i, ids[i])
 	}
 	var results []result
-	for i := 0; i < numStories; i++ {
+	for i := 0; i < len(ids); i++ {
 		results = append(results, <-resultCh)
 	}
 	sort.Slice(results, func(i, j int) bool {
@@ -88,7 +102,7 @@ func getTopStories(numStories int) ([]item, error) {
 			stories = append(stories, res.item)
 		}
 	}
-	return stories, nil
+	return stories
 }
 
 func isStoryLink(item item) bool {
