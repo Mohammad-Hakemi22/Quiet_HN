@@ -33,7 +33,7 @@ func main() {
 func handler(numStories int, tpl *template.Template) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		stories, err := getTopStories(numStories)
+		stories, err := getCachedStories(numStories)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -50,6 +50,24 @@ func handler(numStories int, tpl *template.Template) http.HandlerFunc {
 	})
 }
 
+var (
+	cache           []item
+	cacheExpiration time.Time
+)
+
+func getCachedStories(numStories int) ([]item, error) {
+	if time.Now().Sub(cacheExpiration) < 0 {
+		return cache, nil
+	}
+	stories, err := getTopStories(numStories)
+	if err != nil {
+		return nil, err
+	}
+	cache = stories
+	cacheExpiration = time.Now().Add(20 *time.Second)
+	return cache, nil
+}
+
 func getTopStories(numStories int) ([]item, error) {
 	var client client.Client
 	var stories []item
@@ -62,7 +80,7 @@ func getTopStories(numStories int) ([]item, error) {
 	// having exactly 30 stories
 	at := 0
 	for len(stories) < numStories {
-		need := (numStories - len(stories)) * (5/4)  // for make sure we have already 30 stories id (error on get stories), getting 30 * 1.25 ids
+		need := (numStories - len(stories)) * (5 / 4) // for make sure we have already 30 stories id (error on get stories), getting 30 * 1.25 ids
 		stories = append(stories, getStories(ids[at:at+need])...)
 		at += need
 	}
